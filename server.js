@@ -4,7 +4,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 const HUSMO_BASE = 'https://husmodataapi.com/api';
-const HUSMO_TOKEN = process.env.HUSMO_TOKEN || '';
+const HUSMO_TOKEN = (process.env.HUSMO_TOKEN || '').trim();
 function husmoHeaders() {
   return {
     'Authorization': `Token ${HUSMO_TOKEN}`,
@@ -22,7 +22,7 @@ app.get('/api/balance', async (req, res) => {
     const data = await r.json();
     res.json({ success: true, husmo: data });
   } catch (e) {
-    res.json({ success: false, message: 'Could not reach Husmo', error: String(e) });
+    res.json({ success: false, message: 'Could not reach Husmo' });
   }
 });
 app.get('/api/networks', async (req, res) => {
@@ -32,15 +32,15 @@ app.get('/api/networks', async (req, res) => {
     const data = await r.json();
     res.json({ success: true, husmo: data });
   } catch (e) {
-    res.json({ success: false, message: 'Could not reach Husmo', error: String(e) });
+    res.json({ success: false, message: 'Could not reach Husmo' });
   }
 });
 app.post('/api/buy-data', async (req, res) => {
   const { network, phone, plan } = req.body;
   if (!network || !phone || !plan) {
-    return res.json({ success: false, message: 'Need network, phone and plan. Example: network=network_id, phone=0803..., plan=241' });
+    return res.json({ success: false, message: 'Need network, phone and plan' });
   }
-  if (!HUSMO_TOKEN) return res.json({ success: false, message: 'HUSMO_TOKEN not set in Render Environment - cannot send real data yet' });
+  if (!HUSMO_TOKEN) return res.json({ success: false, message: 'HUSMO_TOKEN not set in Render Environment' });
   try {
     const r = await fetch(`${HUSMO_BASE}/data/`, {
       method: 'POST',
@@ -50,12 +50,12 @@ app.post('/api/buy-data', async (req, res) => {
     const data = await r.json();
     res.json({ success: true, message: 'Sent to Husmo', husmo: data, order: { network, phone, plan } });
   } catch (e) {
-    res.json({ success: false, message: 'Could not reach Husmo', error: String(e) });
+    res.json({ success: false, message: 'Could not reach Husmo' });
   }
 });
 app.post('/api/buy', (req, res) => {
   const { type, network, phone, amount } = req.body;
-  res.json({ success: true, message: 'Test order received - use /api/buy-data for real Husmo data', order: { type, network, phone, amount } });
+  res.json({ success: true, message: 'Test order received', order: { type, network, phone, amount } });
 });
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
