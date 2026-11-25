@@ -1,8 +1,8 @@
-const 【entity-express¦canonical_name=express】 = require('【entity-express¦canonical_name=express】');
-const cors = require('cors');
-const app = 【entity-express¦canonical_name=express】();
+const express = require("express");
+const cors = require("cors");
+const app = express();
 app.use(cors());
-app.use(【entity-express¦canonical_name=express】.json());
+app.use(express.json());
 
 const HUSMO_BASE = "https://api.husmodata.com";
 const HUSMO_TOKEN = process.env.HUSMO_TOKEN || "HUSMO_TOKEN_HERE";
