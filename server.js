@@ -113,7 +113,6 @@ app.get('/vtpass-sandbox-test', async (req, res) => {
       headers: {
         "Content-Type": "application/json",
         "api-key": process.env.VTPASS_SANDBOX_API_KEY,
-        "public-key": process.env.VTPASS_SANDBOX_PUBLIC_KEY,
         "secret-key": process.env.VTPASS_SANDBOX_SECRET_KEY
       },
       body: JSON.stringify(body)
