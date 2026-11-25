@@ -102,7 +102,7 @@ app.get('/vtpass-sandbox-test', async (req, res) => {
     const request_id = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 12) + Math.random().toString(36).slice(2, 12).toUpperCase();
     const body = {
       request_id: request_id,
-      serviceID: "9MOBILE",
+      serviceID: "ETISALAT",
       billersCode: "07044102707",
       variation_code: "",
       amount: 100,
