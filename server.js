@@ -99,26 +99,33 @@ app.post('/api/buy-airtime', async (req, res) => {
 
 app.get('/vtpass-sandbox-test', async (req, res) => {
   try {
-    const request_id = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 12) + Math.random().toString(36).slice(2, 12).toUpperCase();
-    const body = {
-      request_id: request_id,
-      serviceID: "ETISALAT",
-      billersCode: "07044102707",
-      variation_code: "",
-      amount: 100,
-      phone: "07044102707"
-    };
-    const response = await fetch("https://sandbox.vtpass.com/api/pay", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "api-key": process.env.VTPASS_SANDBOX_API_KEY,
-        "secret-key": process.env.VTPASS_SANDBOX_SECRET_KEY
-      },
-      body: JSON.stringify(body)
-    });
-    const data = await response.json();
-    res.json({ my_request_id: request_id, vtpass_response: data });
+    const tests = [
+      { label: "MTN Airtime", serviceID: "MTN", variation_code: "", amount: 100 },
+      { label: "【entity-Airtel¦canonical_name=Airtel】 Airtime", serviceID: AIR + TEL, variation_code: "", amount: 100 },
+      { label: "GLO Airtime", serviceID: "GLO", variation_code: "", amount: 100 },
+      { label: "9mobile Airtime", serviceID: "ETISALAT", variation_code: "", amount: 100 },
+      { label: "MTN Data", serviceID: "MTN-DATA", variation_code: "M102", amount: 100 },
+      { label: "【entity-Airtel¦canonical_name=Airtel】 Data", serviceID: AIR + TEL + "-DATA", variation_code: "A102", amount: 100 },
+      { label: "GLO Data", serviceID: "GLO-DATA", variation_code: "G102", amount: 100 },
+      { label: "9mobile Data", serviceID: "ETISALAT-DATA", variation_code: "E102", amount: 100 }
+    ];
+    const results = [];
+    for (const t of tests) {
+      const request_id = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 12) + Math.random().toString(36).slice(2, 12).toUpperCase();
+      const body = { request_id: request_id, serviceID: t.serviceID, billersCode: "07044102707", variation_code: t.variation_code, amount: t.amount, phone: "07044102707" };
+      try {
+        const response = await fetch("https://sandbox.vtpass.com/api/pay", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "api-key": process.env.VTPASS_SANDBOX_API_KEY, "secret-key": process.env.VTPASS_SANDBOX_SECRET_KEY },
+          body: JSON.stringify(body)
+        });
+        const data = await response.json();
+        results.push({ label: t.label, my_request_id: request_id, vtpass_response: data });
+      } catch (e) {
+        results.push({ label: t.label, my_request_id: request_id, error: e.message });
+      }
+    }
+    res.json({ all_results: results });
   } catch (e) {
     res.json({ success: false, error: e.message });
   }
