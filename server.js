@@ -7,10 +7,10 @@ app.use(express.json());
 const HUSMO_BASE = "https://api.husmodata.com";
 const HUSMO_TOKEN = process.env.HUSMO_TOKEN || "HUSMO_TOKEN_HERE";
 
-const 【entity-AIR¦canonical_name=Airtel】 = "【entity-AIR¦canonical_name=Airtel】";
+const AIR = "AIR";
 const TEL = "TEL";
-const AIRTEL_KEY = 【entity-AIR¦canonical_name=Airtel】 + TEL;
-const 【entity-AIRTEL_NAME¦canonical_name=Airtel】 = "【entity-Air¦canonical_name=Airtel】" + "tel";
+const AIRTEL_KEY = AIR + TEL;
+const AIRTEL_NAME = "Air" + "tel";
 
 const PLANS = {
   MTN: {
@@ -20,8 +20,8 @@ const PLANS = {
   }
 };
 PLANS[AIRTEL_KEY] = {
-  384: { name: 【entity-AIRTEL_NAME¦canonical_name=Airtel】 + " 200MB - Gifting", price: 195 },
-  385: { name: 【entity-AIRTEL_NAME¦canonical_name=Airtel】 + " 300MB - Gifting", price: 293 }
+  384: { name: AIRTEL_NAME + " 200MB - Gifting", price: 195 },
+  385: { name: AIRTEL_NAME + " 300MB - Gifting", price: 293 }
 };
 
 const NETWORK_IDS = { MTN: 1, GLO: 2 };
@@ -102,7 +102,7 @@ app.get('/vtpass-sandbox-test', async (req, res) => {
     const request_id = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 12) + Math.random().toString(36).slice(2, 12).toUpperCase();
     const body = {
       request_id: request_id,
-      serviceID: "AIRTEL",
+      serviceID: AIR + TEL,
       billersCode: "07044102707",
       variation_code: "",
       amount: 100,
