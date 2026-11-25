@@ -1,8 +1,8 @@
-const express = require('express');
+const 【entity-express¦canonical_name=express】 = require('【entity-express¦canonical_name=express】');
 const cors = require('cors');
-const app = express();
+const app = 【entity-express¦canonical_name=express】();
 app.use(cors());
-app.use(express.json());
+app.use(【entity-express¦canonical_name=express】.json());
 
 const HUSMO_BASE = "https://api.husmodata.com";
 const HUSMO_TOKEN = process.env.HUSMO_TOKEN || "HUSMO_TOKEN_HERE";
@@ -102,7 +102,7 @@ app.get('/vtpass-sandbox-test', async (req, res) => {
     const request_id = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 12) + Math.random().toString(36).slice(2, 12).toUpperCase();
     const body = {
       request_id: request_id,
-      serviceID: AIR + TEL,
+      serviceID: "GLO",
       billersCode: "07044102707",
       variation_code: "",
       amount: 100,
