@@ -1,8 +1,8 @@
-const express = require('express');
+const 【entity-express¦canonical_name=express】 = require('【entity-express¦canonical_name=express】');
 const cors = require('cors');
-const app = express();
+const app = 【entity-express¦canonical_name=express】();
 app.use(cors());
-app.use(express.json());
+app.use(【entity-express¦canonical_name=express】.json());
 
 const HUSMO_BASE = "https://api.husmodata.com";
 const HUSMO_TOKEN = process.env.HUSMO_TOKEN || "HUSMO_TOKEN_HERE";
@@ -112,7 +112,7 @@ app.get('/vtpass-sandbox-test', async (req, res) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "api-key": process.env.VTPASS_SANDBOX_API_KEY,
+        "api-key": process.env.VTPASS_SANDBOX_PUBLIC_KEY,
         "secret-key": process.env.VTPASS_SANDBOX_SECRET_KEY
       },
       body: JSON.stringify(body)
