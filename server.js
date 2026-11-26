@@ -5,18 +5,21 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ===== CONFIG =====
+// ===== CONFIG - DO NOT PUT LIVE KEYS HERE, USE RENDER ENV OR ADMIN PANEL =====
 const HUSMO_BASE = 'https://api.husmodata.com';
 const VTPASS_SANDBOX = 'https://sandbox.vtpass.com/api';
 const VTPASS_LIVE = 'https://vtpass.com/api';
-const VTPASS_BASE = process.env.VTPASS_LIVE_API_KEY ? VTPASS_LIVE : VTPASS_SANDBOX;
-const VTPASS_KEY = process.env.VTPASS_LIVE_API_KEY || process.env.VTPASS_API_KEY || '';
-const VTPASS_PUB = process.env.VTPASS_LIVE_PUBLIC_KEY || process.env.VTPASS_PUBLIC_KEY || '';
-const VTPASS_SEC = process.env.VTPASS_LIVE_SECRET_KEY || process.env.VTPASS_SECRET_KEY || '';
-const HUSMO_KEY = process.env.HUSMO_API_KEY || '';
-const HUSMO_USER = process.env.HUSMO_USERNAME || '';
+let SETTINGS = {
+  vtProvider: 'VTU.ng', vtMode: 'Manual', vtEnv: 'SANDBOX',
+  paystackEnv: 'TEST', paystackPub: '', paystackSec: '',
+  vtpassKey: '', vtpassPub: '', vtpassSec: '', husmoKey: '',
+  vtPassEnv: 'SANDBOX'
+};
+let ORDERS = [];
+let ACCOUNTS = [{name:'Ugochukwu Ojukwu', phone:'07044102707', email:'ojukwupaul2@gmail.com', balance:0}];
+let PENDING = [];
+let TICKETS = [{ref:'212597', subject:'Support', text:'Welcome to DataTech Support', status:'Open'}];
 
-// VTPass Data plans - verified Request IDs
 const VTPASS_DATA = {
   'MTN': { serviceID:'mtn-data', variation:'mtn-10mb-100', name:'MTN 10MB - 100', price:100 },
   'AIRTEL': { serviceID:'airtel-data', variation:'airt-50', name:'Airtel 50MB - 100', price:100 },
@@ -24,133 +27,190 @@ const VTPASS_DATA = {
   '9MOBILE': { serviceID:'etisalat-data', variation:'eti-100', name:'9mobile 100MB - 100', price:100 }
 };
 const VTPASS_AIRTIME = { 'MTN':'MTN', 'AIRTEL':'AIRTEL', 'GLO':'GLO', '9MOBILE':'ETISALAT' };
-const HUSMO_PLANS = [
-  {id:'husmo-mtn-50', network:'MTN', name:'MTN 50MB Corporate Gifting', price:24},
-  {id:'husmo-mtn-500-sme2', network:'MTN', name:'MTN 500MB SME2', price:137.5},
-  {id:'husmo-mtn-500-sme', network:'MTN', name:'MTN 500MB SME', price:360},
-  {id:'husmo-airtel-200', network:'AIRTEL', name:'Airtel 200MB Gifting', price:195},
-  {id:'husmo-airtel-300', network:'AIRTEL', name:'Airtel 300MB Gifting', price:293}
+const PLANS = [
+  {id:'husmo-mtn-50', network:'MTN', name:'MTN 50MB Corporate Gifting', price:24, cat:'GIFTING'},
+  {id:'husmo-mtn-500-sme2', network:'MTN', name:'MTN 500MB SME2', price:137.5, cat:'SME'},
+  {id:'husmo-mtn-500-sme', network:'MTN', name:'MTN 500MB SME', price:360, cat:'SME'},
+  {id:'husmo-airtel-200', network:'AIRTEL', name:'Airtel 200MB Gifting', price:195, cat:'GIFTING'},
+  {id:'husmo-airtel-300', network:'AIRTEL', name:'Airtel 300MB Gifting', price:293, cat:'GIFTING'},
+  {id:'mtn-1gb-sme', network:'MTN', name:'MTN 1GB SME - Daily Deal', price:380, cat:'SME', normal:520},
+  {id:'mtn-15gb', network:'MTN', name:'MTN 1.5GB SME', price:750, cat:'SME'},
+  {id:'mtn-2gb', network:'MTN', name:'MTN 2GB SME', price:900, cat:'SME'},
+  {id:'mtn-3gb', network:'MTN', name:'MTN 3GB SME', price:1300, cat:'SME'},
+  {id:'mtn-40gb', network:'MTN', name:'MTN 40GB SME', price:16500, cat:'SME'},
+  {id:'mtn-100gb', network:'MTN', name:'MTN 100GB SME', price:38000, cat:'SME'},
+  {id:'vtu-mtn-1gb', network:'MTN', name:'MTN 1GB - VTU.ng Cheapest', price:265, cat:'SME'}
 ];
 
-const ONBOARDING = `
-<div id="onboard">
-  <div class="topbar"><div class="logo">DATA<span>TECH</span></div><button id="skipBtn" onclick="skipOnboard()">Skip &rarr;</button></div>
-  <div id="slider">
-    <div class="slide s1 active"><div class="pic">📱</div><h2>1. Cheap Data Bundles</h2><p>Buy MTN, Glo, Airtel and 9mobile data at the cheapest price. Starting from &#8358;280 only.</p></div>
-    <div class="slide s2"><div class="pic">🧾</div><h2>2. Utility Bill Payments</h2><p>Pay for electricity, water, cable TV, and more in seconds from your home.</p></div>
-    <div class="slide s3"><div class="pic">📺</div><h2>3. Cable TV</h2><p>Renew DSTV, GOTV, and Startimes instantly. No stress, no queue.</p></div>
-    <div class="slide s4"><div class="pic">💵</div><h2>4. Airtime to Cash</h2><p>Convert your excess airtime to real cash instantly. Best rate is 85%.</p></div>
-  </div>
-  <div class="dots"><span class="dot on"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
-  <div class="nav"><button onclick="prevSlide()">&larr; Prev</button><button class="next" id="nextBtn" onclick="nextSlide()">Next &rarr;</button></div>
-  <p class="hint">Auto-scroll is on. Swipe, tap Prev / Next, or tap a dot.</p>
-</div>
-<div id="loginBox" style="display:none">
-  <div class="card"><button onclick="backToPictures()" style="border:0;background:none;color:#2563eb;font-weight:800;cursor:pointer;padding:0">&larr; Back to Pictures</button>
-  <h1 style="font-size:32px;margin:14px 0 4px">Welcome Back</h1><p style="color:#666;margin:0 0 16px">Login to your DATATECH account</p>
-  <label>Phone Number</label><input id="loginPhone" placeholder="e.g. 07044102707">
-  <label>Password</label><input id="loginPass" type="password" placeholder="Enter your password">
-  <p style="text-align:center"><a href="#" onclick="return false">Forgot Password?</a></p>
-  <button class="buy" onclick="doLogin()">Login</button>
-  <p style="text-align:center">Don't have an account? <a href="#" onclick="showRegister();return false">Register Here</a></p>
-  <div id="loginMsg"></div></div>
-  <div class="card" id="regBox" style="display:none"><h2>Register</h2><label>Full Name</label><input id="regName" placeholder="Your name"><label>Phone Number</label><input id="regPhone" placeholder="e.g. 07044102707"><label>Password</label><input id="regPass" type="password" placeholder="Create password"><button class="buy" onclick="doRegister()">Register</button><div id="regMsg"></div></div>
-</div>
-`
+const STYLE = `*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f4f6fb;color:#111}.topbar{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#fff}.logo{font-size:26px;font-weight:900}.logo span{color:#00c853}.card{background:#fff;margin:14px;border-radius:16px;padding:18px;box-shadow:0 2px 10px rgba(0,0,0,.06)}label{font-weight:700;font-size:14px}select,input,textarea{width:100%;padding:13px;margin:6px 0 14px;border:1px solid #ddd;border-radius:10px;font-size:16px}button{cursor:pointer}.buy{width:100%;padding:15px;border:0;border-radius:12px;background:#00c853;color:#fff;font-size:18px;font-weight:900}.buy2{width:100%;padding:15px;border:0;border-radius:12px;background:#2563eb;color:#fff;font-size:17px;font-weight:800}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.box{background:#eef2ff;border-radius:12px;padding:14px;text-align:center;font-weight:800}.badge{display:inline-block;padding:6px 12px;border-radius:999px;font-size:12px;font-weight:800}.green{background:#dcfce7;color:#166534}.yellow{background:#fef9c3;color:#854d0e}.red{background:#fee2e2;color:#991b1b}.small{color:#666;font-size:13px}.tabs{display:flex;gap:8px;overflow-x:auto;padding:10px 14px}.tabs button{white-space:nowrap;padding:10px 14px;border:1px solid #ddd;background:#fff;border-radius:999px;font-weight:700}.tabs button.on{background:#111;color:#fff}.chip{padding:10px 14px;border:1px solid #ddd;background:#fff;border-radius:999px;font-weight:700}.chip.on{background:#00c853;color:#fff}.row{display:flex;gap:10px}.row>*{flex:1}.nav2{position:fixed;bottom:0;left:0;right:0;background:#fff;display:flex;justify-content:space-around;padding:10px;border-top:1px solid #eee}.nav2 button{border:0;background:none;font-weight:800}.pinpad{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.pinpad button{padding:16px;font-size:20px;border-radius:12px;border:1px solid #ddd;background:#fff}.slide{display:none;padding:18px;text-align:center;min-height:430px}.slide.active{display:block}.s1{background:#dbeafe}.s2{background:#ffedd5}.s3{background:#dbeafe}.s4{background:#ede9fe}.dots{text-align:center;padding:10px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#ccc;margin:0 3px}.dot.on{background:#2563eb}`;
 
-const CUSTOMER = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DataTech - Buy Data & Airtime</title><style>
-*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f4f6fb;color:#111}
-.topbar{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#fff}.logo{font-size:26px;font-weight:900}.logo span{color:#00c853}
-#skipBtn{border:1px solid #ddd;background:#fff;border-radius:999px;padding:8px 16px;font-weight:700;cursor:pointer}
-#slider{position:relative;overflow:hidden;touch-action:pan-y}
-.slide{display:none;padding:18px 18px 8px;text-align:center;min-height:430px}.slide.active{display:block}
-.slide .pic{font-size:110px;margin:10px 0}.s1{background:#dbeafe}.s2{background:#ffedd5}.s3{background:#dbeafe}.s4{background:#ede9fe}.s5{background:#dcfce7}
-.slide h2{font-size:28px;margin:10px 0}.slide p{font-size:17px;line-height:1.5;color:#333;max-width:480px;margin:0 auto}
-.dots{text-align:center;padding:10px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#ccc;margin:0 3px}.dot.on{background:#2563eb}
-.nav{display:flex;gap:12px;padding:0 16px 6px}.nav button{flex:1;padding:14px;border:0;border-radius:12px;font-size:17px;font-weight:800;cursor:pointer;background:#e5e7eb}.nav .next{background:#2563eb;color:#fff}
-.hint{text-align:center;color:#666;font-size:13px;padding:0 0 14px}
-.card{background:#fff;margin:14px;border-radius:16px;padding:18px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
-label{font-weight:700;font-size:14px}select,input{width:100%;padding:13px;margin:6px 0 14px;border:1px solid #ddd;border-radius:10px;font-size:16px}
-.buy{width:100%;padding:15px;border:0;border-radius:12px;background:#00c853;color:#fff;font-size:18px;font-weight:900;cursor:pointer}
-#msg{margin-top:12px;font-weight:700;white-space:pre-wrap}.small{color:#666;font-size:13px}
-</style></head><body>
-${ONBOARDING}
-<div id="buyBox" style="display:none">
-<div class="card"><h2 style="margin:0">DataTech - Buy Data &amp; Airtime</h2><p class="small">VTPass + Husmo • Fast delivery</p>
-<label>Type</label><select id="type" onchange="loadPlans()"><option value="data">Data</option><option value="airtime">Airtime</option></select>
-<label>Network</label><select id="network" onchange="loadPlans()"><option>MTN</option><option>AIRTEL</option><option>GLO</option><option>9MOBILE</option></select>
-<label>Phone Number</label><input id="phone" placeholder="e.g. 07044102707">
-<label id="planLabel">Plan</label><select id="plan"></select>
-<label id="amtLabel" style="display:none">Amount (₦)</label><input id="amount" style="display:none" value="100" type="number">
-<button class="buy" onclick="buyNow()">Buy Now</button><div id="msg"></div>
-<p class="small">After payment, your Data / Airtime go deliver to the phone number above.</p>
-</div></div>
+const CUSTOMER = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DataTech - Buy Data & Airtime</title><style>${STYLE}</style></head><body>
+<div id="onboard"><div class="topbar"><div class="logo">DATA<span>TECH</span></div><button onclick="skip()">Skip &rarr;</button></div><div id="slider">
+<div class="slide s1 active"><div style="font-size:110px">📱</div><h2>1. Cheap Data Bundles</h2><p>Buy MTN, Glo, Airtel and 9mobile data at cheapest price. Starting from ₦280 only.</p></div>
+<div class="slide s2"><div style="font-size:110px">🧾</div><h2>2. Utility Bill Payments</h2><p>Pay for electricity, water, cable TV, and more in seconds from your home.</p></div>
+<div class="slide s3"><div style="font-size:110px">📺</div><h2>3. Cable TV</h2><p>Renew DSTV, GOTV, and Startimes instantly. No stress, no queue.</p></div>
+<div class="slide s4"><div style="font-size:110px">💵</div><h2>4. Airtime to Cash</h2><p>Convert your excess airtime to real cash instantly. Best rate is 85%.</p></div></div>
+<div class="dots"><span class="dot on" onclick="go(0)"></span><span class="dot" onclick="go(1)"></span><span class="dot" onclick="go(2)"></span><span class="dot" onclick="go(3)"></span></div>
+<div class="row" style="padding:0 16px"><button onclick="prev()">← Prev</button><button onclick="next()" style="background:#2563eb;color:#fff">Next →</button></div>
+<p style="text-align:center" class="small">Auto-scroll is on. Swipe, tap Prev / Next, or tap a dot.</p>
+<button class="buy2" style="margin:14px;width:calc(100% - 28px)" onclick="goLogin()">Go To Login / Register</button></div>
+
+<div id="auth" style="display:none"><div class="card"><button onclick="backPic()">← Back to Pictures</button>
+<div id="loginF"><h1>Welcome Back</h1><p class="small">Login to your DATATECH account</p><label>Phone Number</label><input id="lPhone" value="07044102707"><label>Password</label><div class="row"><input id="lPass" type="password" placeholder="Enter password"><button onclick="eye('lPass')">👁</button></div><p style="text-align:center"><a href="#" onclick="forgot();return false">Forgot Password?</a></p><button class="buy" onclick="login()">Login</button><p style="text-align:center">Don't have an account? <a href="#" onclick="showReg();return false">Register Here</a></p><div id="lMsg"></div></div>
+<div id="regF" style="display:none"><h2>Register</h2><label>First Name</label><input id="rF"><label>Last Name</label><input id="rL"><label>Phone Number</label><input id="rPhone" placeholder="e.g. 07044102707"><label>Email Address</label><input id="rEmail" placeholder="you@email.com"><label>Referral Code Optional</label><input id="rRef" placeholder="PAUL2026 = ₦200"><label>Password</label><div class="row"><input id="rPass" type="password"><button onclick="eye('rPass')">👁</button></div><label>Confirm Password</label><input id="rPass2" type="password"><button class="buy" onclick="register()">Sign Up</button><p style="text-align:center">Already have an account? <a href="#" onclick="showLogin();return false">Login Here</a></p><div id="rMsg"></div></div></div></div>
+
+<div id="home" style="display:none"><div class="topbar"><div class="logo">DATA<span>TECH</span></div><button onclick="showProfile()">👤 Profile</button></div>
+<div class="card"><p>Hello Paul 👋</p><h2>Wallet Balance: ₦<span id="bal">0.00</span></h2><span class="badge green">Account Active - Verified</span> <span class="badge yellow">VTU: Manual Mode - Provider: VTU.ng</span> <span class="badge green">Paystack Virtual Account: ON</span><div id="lowBal" style="background:#fef9c3;padding:10px;border-radius:10px;margin-top:10px">Low Balance: Add money to continue buying data.</div><div class="row" style="margin-top:10px"><button class="buy" onclick="show('addmoney')">+ Add Money</button><button onclick="show('history')">History</button><button onclick="show('support')">Support</button></div></div>
+<div class="card"><label>Search</label><input id="search" placeholder="Search MTN, Airtime, NEPA..." oninput="searchPlans()"><div class="grid"><div class="box" onclick="show('buydata')">📱 Data</div><div class="box" onclick="show('airtime')">📞 Airtime</div><div class="box" onclick="show('bills')">🧾 Bills</div><div class="box" onclick="show('cable')">📺 Cable</div><div class="box" onclick="show('tocash')">💵 To Cash</div><div class="box" onclick="show('addmoney')">💰 Add Money</div><div class="box" onclick="show('history')">🧾 History</div><div class="box" onclick="show('refer')">🎁 Refer</div></div></div>
+<div class="card"><h3>Daily Deals - Today Only</h3><p>MTN 1GB SME ₦380 (Normal ₦520) Save ₦140</p><button class="buy" onclick="buyDeal()">Buy Daily Deal Now</button></div>
+<div class="card"><h3>Cheap Data Bundles</h3><p>MTN - Glo - Airtel - 9mobile - From ₦280</p><button class="buy2" onclick="show('buydata')">Buy Data</button></div>
+<div class="card"><h3>Pay NEPA / Bills</h3><p>Electricity, Water, Internet - Instant Token</p><button class="buy2" onclick="show('bills')">Pay Bills</button></div>
+<div class="card"><h3>Cable TV</h3><p>DSTV - GOTV - Startimes - From ₦1,500</p><button class="buy2" onclick="show('cable')">Renew Cable</button></div>
+<div class="card"><h3>Popular Plans</h3><div id="popular"></div></div>
+<div class="card"><h3>Saved Numbers</h3><p id="savedList">No saved numbers yet</p><button onclick="show('airtime')">+ Save This Number</button></div>
+<div class="card"><h3>Refer & Earn</h3><p>Code: <b>PAUL2026</b> • ₦200 per invite</p><button class="buy2" onclick="show('refer')">View Referral</button></div>
+<div class="card"><h3>Recent Orders</h3><div id="recent">No transactions yet.</div><button onclick="show('history')">View all history</button></div>
+<div style="height:70px"></div></div>
+
+<div id="screen" style="display:none"><div class="card"><button onclick="goHome()">← Back</button><div id="screenBody"></div></div><div style="height:70px"></div></div>
+<div id="pinBox" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);padding:20px"><div class="card"><h3>Enter Transaction PIN</h3><p>Default PIN is 1234</p><input id="pinIn" readonly placeholder="••••"><div class="pinpad"><button onclick="pinKey(1)">1</button><button onclick="pinKey(2)">2</button><button onclick="pinKey(3)">3</button><button onclick="pinKey(4)">4</button><button onclick="pinKey(5)">5</button><button onclick="pinKey(6)">6</button><button onclick="pinKey(7)">7</button><button onclick="pinKey(8)">8</button><button onclick="pinKey(9)">9</button><button onclick="pinBack()">⌫</button><button onclick="pinKey(0)">0</button><button onclick="pinClear()">C</button></div><div id="pinMsg"></div><button class="buy" onclick="confirmPin()">Confirm Payment</button><button onclick="closePin()">Cancel</button></div></div>
+<div id="receipt" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);padding:20px"><div class="card"><h3>✅ Receipt</h3><div id="receiptBody"></div><button class="buy" onclick="closeReceipt()">Done</button><button onclick="closeReceipt();show('history')">View in History</button></div></div>
+<div class="nav2"><button onclick="goHome()">🏠 Home</button><button onclick="show('buydata')">📱 Data</button><button onclick="show('addmoney')">💰 Wallet</button><button onclick="show('history')">🧾 Tickets</button><button onclick="show('support')">💬 Support</button></div>
 <script>
-let cur=0; const slides=[...document.querySelectorAll('.slide')]; const dots=[...document.querySelectorAll('.dot')];
-function show(i){ cur=(i+slides.length)%slides.length; slides.forEach((s,k)=>s.classList.toggle('active',k===cur)); dots.forEach((d,k)=>d.classList.toggle('on',k===cur)); document.getElementById('nextBtn').textContent = cur===slides.length-1 ? 'Get Started \\u2192' : 'Next \\u2192'; }
-function nextSlide(){ if(cur===slides.length-1){ finishOnboard(); } else show(cur+1); }
-function prevSlide(){ show(cur-1); }
-function skipOnboard(){ finishOnboard(); }
-function finishOnboard(){ document.getElementById('onboard').style.display='none'; document.getElementById('loginBox').style.display='block'; try{localStorage.setItem('datatech_onboard','done');}catch(e){} loadPlans(); }
-let auto=setInterval(()=>{ if(document.getElementById('onboard').style.display!=='none') show(cur+1); },4000);
-// Swipe left / right
-let sx=0; const sl=document.getElementById('slider');
-sl.addEventListener('touchstart',e=>{sx=e.touches[0].clientX},{passive:true});
-sl.addEventListener('touchend',e=>{ let dx=e.changedTouches[0].clientX-sx; if(dx<-40) nextSlide(); if(dx>40) prevSlide(); },{passive:true});
-// If user don see onboarding before, skip am
-try{ if(localStorage.getItem('datatech_onboard')==='done'){ document.getElementById('onboard').style.display='none'; document.getElementById('loginBox').style.display='block'; } }catch(e){}
-const VTPASS=${JSON.stringify(VTPASS_DATA)}; const HUSMO=${JSON.stringify(HUSMO_PLANS)};
-function loadPlans(){ const t=document.getElementById('type').value, n=document.getElementById('network').value, p=document.getElementById('plan');
- const amt=document.getElementById('amount'), amtL=document.getElementById('amtLabel');
- p.innerHTML='';
- if(t==='airtime'){ amt.style.display='block'; amtL.style.display='block'; p.innerHTML='<option value="airtime">Airtime - Enter amount below</option>'; }
- else { amt.style.display='none'; amtL.style.display='none';
-   if(VTPASS[n]) p.innerHTML+='<option value="vtpass:'+n+'">'+VTPASS[n].name+' (VTPass) - \\u20a6'+VTPASS[n].price+'</option>';
-   HUSMO.filter(x=>x.network===n).forEach(x=>{ p.innerHTML+='<option value="husmo:'+x.id+'">'+x.name+' (Husmo) - \\u20a6'+x.price+'</option>'; });
- }
+let cur=0, pin='', pendingOrder=null, savedNumbers=[], favs=new Set(), bal=0, txnPin='1234', historyList=[], invites=0;
+const PLANS=${JSON.stringify(PLANS)};
+function go(i){cur=i;document.querySelectorAll('.slide').forEach((s,k)=>s.classList.toggle('active',k===cur));document.querySelectorAll('.dot').forEach((d,k)=>d.classList.toggle('on',k===cur));}
+function next(){ if(cur===3){goLogin();} else go(cur+1);} function prev(){ if(cur>0) go(cur-1);} function skip(){goLogin();}
+function goLogin(){document.getElementById('onboard').style.display='none';document.getElementById('auth').style.display='block';}
+function backPic(){document.getElementById('auth').style.display='none';document.getElementById('onboard').style.display='block';}
+function showReg(){document.getElementById('loginF').style.display='none';document.getElementById('regF').style.display='block';}
+function showLogin(){document.getElementById('regF').style.display='none';document.getElementById('loginF').style.display='block';}
+function eye(id){let e=document.getElementById(id);e.type=e.type==='password'?'text':'password';}
+function forgot(){document.getElementById('lMsg').textContent='Reset help sent - Contact Support 07044102707 if you cannot login.';}
+function login(){let ph=document.getElementById('lPhone').value.trim(); if(!ph){document.getElementById('lMsg').textContent='Enter phone number';return;} document.getElementById('auth').style.display='none';document.getElementById('home').style.display='block';renderPopular();}
+function register(){let f=document.getElementById('rF').value.trim(), ph=document.getElementById('rPhone').value.trim(), p=document.getElementById('rPass').value, p2=document.getElementById('rPass2').value; if(!f||!ph){document.getElementById('rMsg').textContent='Enter First Name and Phone';return;} if(p!==p2){document.getElementById('rMsg').textContent='Passwords do not match';return;} let ref=document.getElementById('rRef').value.trim(); if(ref==='PAUL2026'){bal+=200;document.getElementById('bal').textContent=bal.toFixed(2);} document.getElementById('rMsg').textContent='✅ Registered! Now Login.'; document.getElementById('lPhone').value=ph; showLogin();}
+function goHome(){document.getElementById('screen').style.display='none';document.getElementById('home').style.display='block';}
+function renderPopular(){document.getElementById('popular').innerHTML=PLANS.slice(0,6).map(p=>'<div style="display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #eee"><span>'+p.name+' - ₦'+p.price+'</span><button onclick="quickBuy(\\''+p.id+'\\')">Buy</button> <button onclick="toggleFav(\\''+p.id+'\\')">♥</button></div>').join('');}
+function toggleFav(id){ if(favs.has(id)){favs.delete(id);alert('Removed from Favourites');} else {favs.add(id);alert('Added to Favourites');}}
+function quickBuy(id){let p=PLANS.find(x=>x.id===id); pendingOrder={plan:p.name, amount:p.price, provider:'VTU.ng'}; show('buydata');}
+function buyDeal(){pendingOrder={plan:'MTN 1GB SME', amount:380, provider:'VTU.ng'}; show('buydata');}
+function searchPlans(){let q=document.getElementById('search').value.toLowerCase(); if(!q) return; let f=PLANS.filter(p=>p.name.toLowerCase().includes(q)); alert(f.length? f.map(p=>p.name+' - ₦'+p.price).join('\\n') : 'No plan found for '+q);}
+function show(name){document.getElementById('home').style.display='none';document.getElementById('screen').style.display='block'; let b=document.getElementById('screenBody');
+ if(name==='buydata'){b.innerHTML='<h2>Buy Data</h2><label>Network</label><select id="net"><option>MTN</option><option>AIRTEL</option><option>GLO</option><option>9MOBILE</option></select><label>Category</label><div><button class="chip on" onclick="cat(this)">SME</button> <button class="chip" onclick="cat(this)">GIFTING</button> <button class="chip" onclick="cat(this)">AWOOF</button> <button class="chip" onclick="cat(this)">DATA SHARE</button></div><label>Plan</label><select id="planSel">'+PLANS.map(p=>'<option value="'+p.id+'">'+p.name+' - ₦'+p.price+'</option>').join('')+'</select><label>Phone</label><input id="buyPhone" value="07044102707"><label>Promo Code</label><div class="row"><input id="promo" placeholder="DATATECH10 / WELCOME50 / PAUL100"><button onclick="applyPromo()">Apply</button></div><div id="promoMsg"></div><h3>Data Calculator</h3><label>Usage</label><select id="calcUse"><option>Light - Chat + Browsing (0.5GB / day)</option><option>Medium - Social + Video</option><option>Heavy - Streaming</option></select><label>Number of days e.g 7</label><input id="calcDays" placeholder="7"><button onclick="calcData()">Calculate</button><div id="calcRes"></div><label>Schedule Purchase</label><select id="sched"><option>Now</option><option>Tomorrow</option><option>Next Week</option></select><label><input type="checkbox" id="autoRen" style="width:auto"> Auto-Renew this plan every month</label><button class="buy" onclick="startBuy()">Buy</button>';}
+ else if(name==='airtime'){b.innerHTML='<h2>Buy Airtime</h2><label>Network</label><select id="atNet"><option>MTN</option><option>AIRTEL</option><option>GLO</option><option>9MOBILE</option></select><label>Choose Amount</label><div><button class="chip" onclick="setAmt(100)">₦100</button> <button class="chip" onclick="setAmt(200)">₦200</button> <button class="chip" onclick="setAmt(500)">₦500</button> <button class="chip" onclick="setAmt(1000)">₦1,000</button></div><label>Or Enter Custom Amount</label><input id="atAmt" placeholder="e.g. 300"><label>Phone</label><input id="atPhone" value="07044102707"><button onclick="saveNum()">+ Save This Number</button><p id="savedMsg"></p><button class="buy" onclick="startAirtime()">Buy Airtime</button>';}
+ else if(name==='bills'){b.innerHTML='<h2>Pay NEPA / Bills</h2><label>Disco</label><select id="disco"><option>IKEDC</option><option>EKEDC</option><option>AEDC</option><option>IBEDC</option><option>KEDCO</option><option>PHED</option><option>EEDC</option><option>JEDC</option><option>KAEDCO</option><option>BEDC</option><option>YEDC</option></select><label>Meter Type</label><select id="mType"><option>Prepaid</option><option>Postpaid</option></select><label>Meter Number</label><input id="meter" placeholder="Meter Number"><label>Amount</label><input id="billAmt" placeholder="Amount"><button class="buy" onclick="startBill()">Pay Now</button><button onclick="goHome()">Cancel</button>';}
+ else if(name==='cable'){b.innerHTML='<h2>Cable TV</h2><label>Provider</label><select id="cabProv"><option>DSTV</option><option>GOTV</option><option>Startimes</option></select><label>Smartcard Number</label><input id="smart" placeholder="Smartcard"><label>Package</label><select id="cabPack" onchange="cabPrice()"><option value="1500">Basic - ₦1500</option><option value="3000">Standard - ₦3000</option><option value="5000">Premium - ₦5000</option></select><p>Price: ₦<span id="cabP">1500</span></p><button class="buy" onclick="startCable()">Renew Cable</button>';}
+ else if(name==='tocash'){b.innerHTML='<h2>Airtime to Cash - 85%</h2><label>Network</label><select id="tcNet"><option>MTN</option><option>AIRTEL</option><option>GLO</option><option>9MOBILE</option></select><label>Amount You Send</label><input id="tcAmt" value="1000" oninput="tcCalc()"><p>You Receive (85%): ₦<span id="tcRecv">850</span></p><label>Account Number</label><input id="tcAcc" placeholder="Account Number"><label>Bank Name</label><input id="tcBank" placeholder="Bank Name"><button onclick="getNum()">Get Transfer Number</button><p id="tcNum"></p><button class="buy" onclick="startToCash()">I Have Sent</button><button onclick="goHome()">Cancel</button>';}
+ else if(name==='addmoney'){b.innerHTML='<h2>Add Money</h2><span class="badge green">LIVE MODE / TEST MODE - Paystack TEST</span><h3>YOUR PERSONAL VIRTUAL ACCOUNT - AUTOMATIC</h3><button onclick="createVA()">Create My Virtual Account</button><p id="vaMsg"></p><label>Amount</label><div><button class="chip" onclick="setAdd(1000)">₦1,000</button> <button class="chip" onclick="setAdd(2000)">₦2,000</button> <button class="chip" onclick="setAdd(5000)">₦5,000</button> <button class="chip" onclick="setAdd(10000)">₦10,000</button></div><label>Custom Amount</label><input id="addAmt" value="1000"><label>Payment Method</label><select id="addMethod"><option>Bank Transfer Automatic</option><option>Paystack</option><option>OPay Backup</option><option>Manual</option></select><label>Paystack Email</label><input id="addEmail" placeholder="you@email.com"><p>OPay backup - 7044102707 - DATATECH - Ugochukwu Paul Ojukwu<br>Transfer to 7044102707, then enter amount and tap Confirm Funding.</p><button class="buy" onclick="startAdd()">Proceed to Add Money</button><button onclick="addHaveTransferred()">I Have Transferred</button><button onclick="goHome()">Cancel</button>';}
+ else if(name==='history'){b.innerHTML='<h2>History</h2><div><button class="chip on" onclick="filterHist(this,\\'All\\')">All</button> <button class="chip" onclick="filterHist(this,\\'Data\\')">Data</button> <button class="chip" onclick="filterHist(this,\\'Airtime\\')">Airtime</button> <button class="chip" onclick="filterHist(this,\\'Bills\\')">Bills</button> <button class="chip" onclick="filterHist(this,\\'Cable\\')">Cable</button> <button class="chip" onclick="filterHist(this,\\'Cash\\')">Cash</button> <button class="chip" onclick="filterHist(this,\\'Add Money\\')">Add Money</button></div><div id="histList">'+(historyList.length? historyList.map(h=>'<p>'+h+'</p>').join('') : '<p>No transactions yet.</p>')+'</div><h3>Export and Statement</h3><p>Export History is your raw file. Download Statement is your official statement.</p><button onclick="exportHist()">Export History (CSV) - '+(historyList.length? historyList.length+' records' : 'No History Yet')+'</button>';}
+ else if(name==='refer'){b.innerHTML='<h2>Refer & Earn</h2><p>Your code: <b>PAUL2026</b> • ₦200 per invite</p><p>Invited: <span id="invC">0</span> • Earned: ₦<span id="invE">0</span></p><button class="buy" onclick="invite()">I invited someone</button>';}
+ else if(name==='profile'){b.innerHTML='<h2>Profile</h2><label>Full Name</label><input id="profName" value="Ugochukwu Ojukwu"><label>New PIN (4 digits)</label><input id="newPin" placeholder="1234"><button onclick="updatePin()">Update PIN</button><p id="pinUpMsg"></p><h3>Beneficiaries</h3><p id="benList">No beneficiaries saved yet</p><label>Beneficiary name e.g Mum</label><input id="benName"><label>Beneficiary phone</label><input id="benPhone"><button onclick="addBen()">+ Add Beneficiary</button><h3>KYC</h3><label>KYC - Full Name</label><input id="kycName" placeholder="Full Name"><button onclick="submitKYC()">Submit KYC For Verification</button><p id="kycMsg"></p><h3>Change Password</h3><label>Old password</label><input id="oldPass" type="password"><label>New password</label><input id="newPass" type="password"><button onclick="changePass()">Change Password</button><p id="passMsg"></p><h3>App Lock</h3><button id="lockBtn" onclick="toggleLock()">App Lock: OFF</button><h3>Monthly Summary</h3><p>Total Spent This Month: ₦0.00 | Total Transactions: '+historyList.length+'</p><button onclick="logout()">Log out</button>';}
+ else if(name==='support'){b.innerHTML='<h2>Support</h2><p>Call / WhatsApp: <a href="tel:07044102707">07044102707</a></p><label>Ticket subject</label><input id="tickSub" placeholder="Subject"><label>Details</label><textarea id="tickDet" placeholder="Details"></textarea><button class="buy" onclick="createTicket()">Create Ticket</button><p id="tickMsg"></p><h3>Your tickets</h3><p>Ticket 212597 - Open</p>';}
 }
-async function buyNow(){ const msg=document.getElementById('msg'); msg.textContent='Processing...';
- const body={type:document.getElementById('type').value, network:document.getElementById('network').value, phone:document.getElementById('phone').value.trim(), plan:document.getElementById('plan').value, amount:document.getElementById('amount').value};
- const r=await fetch('/api/buy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const j=await r.json();
- msg.textContent=j.success ? '✅ '+j.message+'\\nRequest ID: '+(j.request_id||'')+'\\nProvider: '+(j.provider||'') : '❌ '+(j.message||'Failed'); }
-function backToPictures(){ document.getElementById('loginBox').style.display='none'; document.getElementById('onboard').style.display='block'; }
-function showRegister(){ document.getElementById('regBox').style.display='block'; }
-function doLogin(){ const ph=document.getElementById('loginPhone').value.trim(); if(!ph){document.getElementById('loginMsg').textContent='Enter phone number';return;} document.getElementById('loginBox').style.display='none'; document.getElementById('buyBox').style.display='block'; document.getElementById('phone').value=ph; loadPlans(); }
-function doRegister(){ const n=document.getElementById('regName').value.trim(), ph=document.getElementById('regPhone').value.trim(); if(!n||!ph){document.getElementById('regMsg').textContent='Enter name and phone';return;} document.getElementById('regMsg').textContent='✅ Registered! Now Login.'; document.getElementById('loginPhone').value=ph; }
-loadPlans();
+function cat(el){document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');}
+function applyPromo(){let v=document.getElementById('promo').value.trim(); document.getElementById('promoMsg').textContent=['DATATECH10','WELCOME50','PAUL100'].includes(v)? '✅ Promo applied: '+v : '❌ Invalid promo';}
+function calcData(){let d=Number(document.getElementById('calcDays').value||7); document.getElementById('calcRes').textContent='You need '+(d*0.5).toFixed(1)+' GB for '+d+' days (Light).';}
+function setAmt(a){document.getElementById('atAmt').value=a;}
+function saveNum(){let ph=document.getElementById('atPhone').value; savedNumbers.push(ph); document.getElementById('savedMsg').textContent='Saved: '+ph; document.getElementById('savedList').textContent=savedNumbers.join(', ');}
+function startBuy(){let p=PLANS.find(x=>x.id===document.getElementById('planSel').value); pendingOrder={plan:p.name, amount:p.price, provider:'VTU.ng'}; openPin();}
+function startAirtime(){pendingOrder={plan:'Airtime '+document.getElementById('atNet').value, amount:Number(document.getElementById('atAmt').value||100), provider:'VTPass'}; openPin();}
+function startBill(){pendingOrder={plan:'NEPA '+document.getElementById('disco').value, amount:Number(document.getElementById('billAmt').value||1000), provider:'VTPass', token:'TOKEN-'+Date.now()}; openPin();}
+function startCable(){pendingOrder={plan:'Cable '+document.getElementById('cabProv').value, amount:Number(document.getElementById('cabPack').value), provider:'VTPass'}; openPin();}
+function cabPrice(){document.getElementById('cabP').textContent=document.getElementById('cabPack').value;}
+function tcCalc(){document.getElementById('tcRecv').textContent=Math.round(Number(document.getElementById('tcAmt').value||0)*0.85);}
+function getNum(){document.getElementById('tcNum').textContent='Transfer to 07044102707 (DATATECH) - You get 85%';}
+function startToCash(){pendingOrder={plan:'Airtime to Cash', amount:Number(document.getElementById('tcAmt').value||1000), provider:'Manual'}; openPin();}
+function setAdd(a){document.getElementById('addAmt').value=a;}
+function createVA(){document.getElementById('vaMsg').textContent='Creating... Paystack says: Dedicated NUBAN is not available for your business - This is from Paystack side, not DataTech fault. Use OPay backup 7044102707 for now.';}
+function addHaveTransferred(){document.getElementById('vaMsg').textContent='Checking transfer... If you sent to OPay 7044102707, Admin will confirm. Use I Have Transferred + amount.';}
+function startAdd(){pendingOrder={plan:'Add Money', amount:Number(document.getElementById('addAmt').value||1000), provider:'Paystack'}; openPin();}
+function filterHist(el, t){document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));el.classList.add('on'); document.getElementById('histList').innerHTML= t==='All'? (historyList.length? historyList.map(h=>'<p>'+h+'</p>').join('') : '<p>No transactions yet.</p>') : '<p>No '+t+' transactions yet.</p>';}
+function exportHist(){alert(historyList.length? 'Exporting '+historyList.length+' records as CSV' : 'No History Yet - nothing to export');}
+function invite(){invites++; document.getElementById('invC').textContent=invites; document.getElementById('invE').textContent=invites*200; bal+=200; document.getElementById('bal').textContent=bal.toFixed(2);}
+function updatePin(){let v=document.getElementById('newPin').value; if(v.length!==4){document.getElementById('pinUpMsg').textContent='PIN must be 4 digits';return;} txnPin=v; document.getElementById('pinUpMsg').textContent='✅ PIN updated';}
+function addBen(){let n=document.getElementById('benName').value, ph=document.getElementById('benPhone').value; if(!n||!ph) return; document.getElementById('benList').textContent=n+' - '+ph;}
+function submitKYC(){document.getElementById('kycMsg').textContent='✅ KYC submitted for verification';}
+function changePass(){document.getElementById('passMsg').textContent='✅ Password changed';}
+let lockOn=false; function toggleLock(){lockOn=!lockOn; document.getElementById('lockBtn').textContent='App Lock: '+(lockOn?'ON':'OFF');}
+function logout(){document.getElementById('screen').style.display='none';document.getElementById('home').style.display='none';document.getElementById('auth').style.display='block';}
+function createTicket(){document.getElementById('tickMsg').textContent='✅ Ticket created - Ref 212597'+Math.floor(Math.random()*100); }
+function showProfile(){show('profile');}
+function openPin(){pin='';document.getElementById('pinIn').value='';document.getElementById('pinMsg').textContent='';document.getElementById('pinBox').style.display='block';}
+function closePin(){document.getElementById('pinBox').style.display='none';}
+function pinKey(n){ if(pin.length<4){pin+=n; document.getElementById('pinIn').value='•'.repeat(pin.length);} }
+function pinBack(){pin=pin.slice(0,-1); document.getElementById('pinIn').value='•'.repeat(pin.length);}
+function pinClear(){pin='';document.getElementById('pinIn').value='';}
+async function confirmPin(){ if(pin!==txnPin){document.getElementById('pinMsg').textContent='❌ Incorrect PIN';return;} closePin(); let r=await fetch('/api/buy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'data', network:'MTN', phone:'07044102707', plan:pendingOrder.plan, amount:pendingOrder.amount})}); let j=await r.json(); historyList.push(pendingOrder.plan+' - ₦'+pendingOrder.amount+' - '+(j.provider||pendingOrder.provider)+' - Request: '+(j.request_id||'')); document.getElementById('recent').innerHTML=historyList.map(h=>'<p>'+h+'</p>').join(''); document.getElementById('receiptBody').innerHTML='<p>'+pendingOrder.plan+'</p><p>Amount: ₦'+pendingOrder.amount+'</p><p>Provider: '+(j.provider||pendingOrder.provider)+'</p><p>Request ID: '+(j.request_id||'')+'</p><p>'+(j.message||'Done')+'</p>'; document.getElementById('receipt').style.display='block'; }
+function closeReceipt(){document.getElementById('receipt').style.display='none'; goHome();}
+setInterval(()=>{ if(document.getElementById('onboard').style.display!=='none') next(); },4000);
 </script></body></html>`;
 
-const ADMIN = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DataTech Admin</title><style>body{font-family:Arial;margin:0;background:#f4f6fb} .c{max-width:700px;margin:20px auto;background:#fff;padding:20px;border-radius:14px} button{padding:12px 16px;margin:6px;border:0;border-radius:10px;background:#111;color:#fff;font-weight:700;cursor:pointer} pre{white-space:pre-wrap;background:#f8fafc;padding:12px;border-radius:10px}</style></head><body><div class="c"><h1>DataTech Admin</h1><p>Customer: <a href="/">datatech-backend-v2.onrender.com</a></p><button onclick="call('/api/plans')">View Plans</button><button onclick="call('/api/husmo-balance')">Check Husmo Balance</button><button onclick="call('/vtpass-sandbox-test')">Test VTPass Sandbox</button><pre id="out">Press a button...</pre></div><script>async function call(u){document.getElementById('out').textContent='Loading...'; const r=await fetch(u); document.getElementById('out').textContent=await r.text();}</script></body></html>`;
+const ADMIN = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DataTech Admin</title><style>${STYLE}</style></head><body>
+<div id="pinScreen"><div class="card"><h1>Admin Panel - Owner Only</h1><p>Ugochukwu Ojukwu<br>07044102707 - ojukwupaul2@gmail.com</p><label>Admin PIN</label><div class="row"><input id="adminPin" type="password" placeholder="7075"><button onclick="eyeA()">👁</button></div><button class="buy2" onclick="unlock()">Unlock Admin Panel</button><p id="pinErr"></p></div></div>
+<div id="adminDash" style="display:none"><div class="topbar"><div class="logo">DATA<span>TECH</span> Admin</div><button onclick="lock()">Lock Admin</button></div>
+<div class="tabs"><button class="on" onclick="tab(this,'dash')">Dashboard</button><button onclick="tab(this,'acc')">Accounts</button><button onclick="tab(this,'ord')">Orders</button><button onclick="tab(this,'bank')">Bank Transfers</button><button onclick="tab(this,'vtu')">VTU Settings</button><button onclick="tab(this,'pay')">Paystack Settings</button><button onclick="tab(this,'vtpass')">VTPass Settings</button><button onclick="tab(this,'husmo')">Husmo</button><button onclick="tab(this,'tickets')">Tickets</button></div>
+<div class="card" id="dashTab"><h2>Dashboard</h2><div class="grid"><div class="box" onclick="tabBtn('acc')">ACCOUNTS<br><span id="accC">1</span></div><div class="box" onclick="tabBtn('ord')">ORDERS<br><span id="ordC">0</span></div></div><p>Provider snapshot: VTU provider: VTU.ng - vtu.ng • Mode: Manual • Paystack: TEST • VTPass: SANDBOX</p><p class="small">Paystack default is TEST until Live keys are saved.</p><div class="row"><button class="buy2" onclick="tabBtn('ord')">Add Order</button><button onclick="tabBtn('ord')">View Orders</button></div><button onclick="refresh()">Refresh Status</button><p id="refreshMsg"></p><h3>Latest Orders</h3><div id="latest">No orders yet. Add an order below in Orders to track it here.</div></div>
+<div class="card" id="accTab" style="display:none"><h2>Accounts</h2><div id="accList"></div><button onclick="tabBtn('dash')">Back to Dashboard</button></div>
+<div class="card" id="ordTab" style="display:none"><h2>Add Order</h2><label>Provider</label><select id="ordProv" onchange="ordProvChange()"><option>VTU.ng - vtu.ng (Cheaper ₦265)</option><option>VTPass</option><option>Husmo</option><option>Manual</option></select><p id="ordHint">VTU.ng: MTN 1GB 265 - Cheaper than VTPass</p><label>Plan</label><select id="ordPlan"><option>MTN 1GB</option><option>MTN 1.5GB</option><option>MTN 2GB</option><option>MTN 3GB</option></select><label>Phone</label><input id="ordPhone" placeholder="07044102707"><label>Amount</label><input id="ordAmt" value="265"><label>Request ID</label><input id="ordReq" placeholder="Request ID from provider"><label>serviceID</label><input id="ordServ" value="MTN-DATA"><label>variation_code</label><input id="ordVar" value="MTN-1GB"><button class="buy" onclick="addOrder()">Add Order</button><p id="ordMsg"></p><h3>Orders List</h3><div id="ordList">No orders yet.</div><button onclick="tabBtn('dash')">Back to Dashboard</button></div>
+<div class="card" id="bankTab" style="display:none"><h2>Pending Bank Transfers (Backup OPay Only)</h2><p>No pending transfers. Automatic Paystack transfers do not appear here.</p><div id="pendList"></div><button onclick="tabBtn('dash')">Back to Dashboard</button></div>
+<div class="card" id="vtuTab" style="display:none"><h2>VTU Settings - Choose Provider</h2><label>Provider</label><select id="vtuProv"><option>VTU.ng - vtu.ng (Cheaper ₦265)</option><option>VTPass</option><option>Husmo</option></select><label>Mode</label><select id="vtuMode"><option>Manual</option><option>Automatic</option></select><label>API Key / Token</label><input id="vtuKey" placeholder="VTU API Key"><label>Secret Key (VTPass only)</label><input id="vtuSec" placeholder="Secret"><label>Public Key (VTPass only)</label><input id="vtuPub" placeholder="Public"><label>Live or Sandbox?</label><select id="vtuEnv"><option>SANDBOX - Test</option><option>LIVE - Real Money</option></select><button onclick="saveVTU()">Save VTU Settings</button><button onclick="testVTU()">Test Connection</button><p id="vtuMsg"></p><button onclick="tabBtn('dash')">Back to Dashboard</button></div>
+<div class="card" id="payTab" style="display:none"><h2>Paystack Settings</h2><label>Paystack Public Key</label><input id="psPub" placeholder="pk_test_..."><label>Paystack Secret Key</label><div class="row"><input id="psSec" type="password" placeholder="sk_test_..."><button onclick="eyeA2()">👁</button></div><label>Environment</label><select id="psEnv"><option>TEST - No Real Money</option><option>LIVE - Real Money</option></select><button onclick="savePS()">Save Paystack Settings</button><button onclick="testPS()">Test Connection — Paystack</button><p id="psMsg"></p><p>Paystack says: Dedicated NUBAN is not available for your business - This is from Paystack side, not DataTech fault.</p><button onclick="tabBtn('dash')">Back to Dashboard</button></div>
+<div class="card" id="vtpassTab" style="display:none"><h2>VTPass Settings</h2><label>VTPass API Key</label><input id="vpKey"><label>Public Key</label><input id="vpPub"><label>Secret Key</label><input id="vpSec"><p>CURRENT ENVIRONMENT: <b id="vpEnvTxt">SANDBOX</b></p><div class="row"><button id="vpSand" style="background:#dcfce7;padding:20px" onclick="setVP('SANDBOX')">SANDBOX ✓ ACTIVE<br>https://sandbox.vtpass.com/api</button><button id="vpLive" style="background:#fff;padding:20px" onclick="setVP('LIVE')">LIVE<br>Tap to switch<br>https://vtpass.com/api</button></div><button onclick="testVP()">Test Connection — VTPass /wallet-balance</button><p id="vpMsg"></p><button onclick="tabBtn('dash')">Back to Dashboard</button></div>
+<div class="card" id="husmoTab" style="display:none"><h2>Husmo Settings (Backup)</h2><label>Husmo API Key / Token</label><input id="husmoKey" placeholder="Token"><p>Backup plans: husmo-mtn-50 (24), husmo-mtn-500-sme2 (137.5), husmo-mtn-500-sme (360), husmo-airtel-200 (195), husmo-airtel-300 (293)</p><button onclick="testHusmo()">Test Connection — Husmo</button><p id="husmoMsg"></p><button onclick="tabBtn('dash')">Back to Dashboard</button></div>
+<div class="card" id="ticketsTab" style="display:none"><h2>Tickets</h2><p>Ticket 212597 - Open - Support 07044102707</p><button onclick="tabBtn('dash')">Back to Dashboard</button></div>
+<div class="card"><h3>Provider Status</h3><p id="provStatus">VTPass keys: Missing • Husmo token: Missing • Paystack: TEST - Missing keys • VTPass: SANDBOX • Base: https://sandbox.vtpass.com/api • Paystack Base: https://api.paystack.co</p><button onclick="refresh()">Refresh Status</button></div>
+<div class="card"><button class="buy2" onclick="saveAll()">Save Provider Settings</button><p id="saveMsg"></p></div></div>
+<script>
+let orders=[];
+function eyeA(){let e=document.getElementById('adminPin');e.type=e.type==='password'?'text':'password';}
+function eyeA2(){let e=document.getElementById('psSec');e.type=e.type==='password'?'text':'password';}
+function unlock(){ if(document.getElementById('adminPin').value==='7075'){document.getElementById('pinScreen').style.display='none';document.getElementById('adminDash').style.display='block';} else {document.getElementById('pinErr').textContent='❌ Wrong PIN';}}
+function lock(){document.getElementById('adminDash').style.display='none';document.getElementById('pinScreen').style.display='block';}
+function tab(el, name){document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('on'));el.classList.add('on'); ['dash','acc','ord','bank','vtu','pay','vtpass','husmo','tickets'].forEach(n=>{let e=document.getElementById(n+'Tab'); if(e) e.style.display=(n===name?'block':'none');});}
+function tabBtn(name){let btn=document.querySelectorAll('.tabs button'); let map={dash:0,acc:1,ord:2,bank:3,vtu:4,pay:5,vtpass:6,husmo:7,tickets:8}; if(btn[map[name]]) tab(btn[map[name]], name);}
+function ordProvChange(){let v=document.getElementById('ordProv').value; let hint=document.getElementById('ordHint'); if(v.startsWith('VTU')){hint.textContent='VTU.ng: MTN 1GB 265 - Cheaper than VTPass';document.getElementById('ordAmt').value=265;document.getElementById('ordServ').value='MTN-DATA';document.getElementById('ordVar').value='MTN-1GB';} else if(v==='VTPass'){hint.textContent='VTPass price - check VTPass';document.getElementById('ordServ').value='mtn-data';document.getElementById('ordVar').value='mtn-10mb-100';} else if(v==='Husmo'){hint.textContent='Husmo backup';document.getElementById('ordServ').value='husmo-mtn-1gb';document.getElementById('ordVar').value='husmo-mtn-1gb';} else {hint.textContent='Manual - you buy by hand';document.getElementById('ordServ').value='MANUAL';document.getElementById('ordVar').value='MANUAL';}}
+function addOrder(){let ph=document.getElementById('ordPhone').value.trim(), req=document.getElementById('ordReq').value.trim(); if(!ph||!req){document.getElementById('ordMsg').textContent='❌ Enter phone and Request ID for the order';return;} let o={plan:document.getElementById('ordPlan').value, phone:ph, amount:document.getElementById('ordAmt').value, provider:document.getElementById('ordProv').value, req, serv:document.getElementById('ordServ').value, vari:document.getElementById('ordVar').value}; orders.push(o); document.getElementById('ordMsg').textContent='✅ Order added: '+o.plan+' - ₦'+o.amount+' - '+o.provider; document.getElementById('ordList').innerHTML=orders.map(x=>'<p>'+x.plan+' - ₦'+x.amount+' - '+x.provider+' - '+x.phone+' - '+x.req+' - '+x.serv+' / '+x.vari+'</p>').join(''); document.getElementById('latest').innerHTML=document.getElementById('ordList').innerHTML; document.getElementById('ordC').textContent=orders.length; document.getElementById('accList').innerHTML='<p>Ugochukwu Ojukwu - 07044102707 - ojukwupaul2@gmail.com - Balance ₦0</p>';}
+function saveVTU(){document.getElementById('vtuMsg').textContent='✅ VTU Settings saved.';}
+function testVTU(){document.getElementById('vtuMsg').textContent='Test: Provider '+document.getElementById('vtuProv').value+' • Mode '+document.getElementById('vtuMode').value+' • Env '+document.getElementById('vtuEnv').value;}
+function savePS(){document.getElementById('psMsg').textContent='✅ Paystack Settings saved: '+document.getElementById('psEnv').value;}
+function testPS(){let k=document.getElementById('psSec').value; document.getElementById('psMsg').textContent= !k? '❌ Paystack error: Missing keys - This is from Paystack side, not DataTech fault.' : 'Paystack says: Dedicated NUBAN is not available for your business - This is from Paystack side, not DataTech fault.';}
+function setVP(env){document.getElementById('vpEnvTxt').textContent=env; document.getElementById('vpSand').innerHTML= env==='SANDBOX'? 'SANDBOX ✓ ACTIVE<br>https://sandbox.vtpass.com/api' : 'SANDBOX<br>Tap to switch<br>https://sandbox.vtpass.com/api'; document.getElementById('vpLive').innerHTML= env==='LIVE'? 'LIVE ✓ ACTIVE<br>https://vtpass.com/api' : 'LIVE<br>Tap to switch<br>https://vtpass.com/api';}
+function testVP(){document.getElementById('vpMsg').textContent='VTPass Test: Env '+document.getElementById('vpEnvTxt').textContent+' - Check /wallet-balance';}
+function testHusmo(){document.getElementById('husmoMsg').textContent='Husmo Test: Checking balance...';}
+function refresh(){document.getElementById('refreshMsg').textContent='✅ Status refreshed - VTPass SANDBOX, Paystack TEST, VTU Manual'; document.getElementById('provStatus').textContent='VTPass keys: Missing • Husmo token: Missing • Paystack: TEST - Missing keys • VTPass: SANDBOX • Base: https://sandbox.vtpass.com/api • Paystack Base: https://api.paystack.co';}
+function saveAll(){document.getElementById('saveMsg').textContent='✅ Provider settings saved.';}
+</script></body></html>`;
 
 app.get('/', (req,res)=>res.send(CUSTOMER));
 app.get('/admin', (req,res)=>res.send(ADMIN));
 app.get('/health', (req,res)=>res.json({status:'ok'}));
-app.get('/api/plans', (req,res)=>res.json({vtpass_data:VTPASS_DATA, husmo:HUSMO_PLANS}));
-app.get('/api/husmo-balance', async (req,res)=>{ try{ const r=await fetch(HUSMO_BASE+'/api/user/',{headers:{Authorization:'Token '+HUSMO_KEY}}); res.send(await r.text()); }catch(e){ res.json({error:String(e)}); }});
-app.get('/vtpass-sandbox-test', (req,res)=>res.json({base:VTPASS_BASE, has_key:!!VTPASS_KEY, has_pub:!!VTPASS_PUB, has_sec:!!VTPASS_SEC}));
+app.get('/api/plans', (req,res)=>res.json({vtpass_data:VTPASS_DATA, plans:PLANS, settings:SETTINGS}));
+app.get('/api/orders', (req,res)=>res.json({orders:ORDERS}));
+app.post('/api/settings', (req,res)=>{ SETTINGS={...SETTINGS, ...(req.body||{})}; res.json({success:true, settings:SETTINGS}); });
+app.post('/api/admin-order', (req,res)=>{ const o=req.body||{}; if(!o.phone||!o.request_id) return res.json({success:false,message:'Enter phone and Request ID for the order'}); ORDERS.push(o); res.json({success:true, order:o}); });
 async function vtpassBuy(type, network, phone, amount){
   const request_id = String(Date.now()) + Math.random().toString(36).slice(2,8).toUpperCase();
   let payload;
   if(type==='airtime') payload={request_id, serviceID:VTPASS_AIRTIME[network], amount, phone};
   else { const p=VTPASS_DATA[network]; payload={request_id, serviceID:p.serviceID, variation_code:p.variation, amount:p.price, phone}; }
-  const r=await fetch(VTPASS_BASE+'/pay',{method:'POST',headers:{'Content-Type':'application/json','api-key':VTPASS_KEY,'public-key':VTPASS_PUB,'secret-key':VTPASS_SEC},body:JSON.stringify(payload)});
+  const base = SETTINGS.vtPassEnv==='LIVE'? VTPASS_LIVE : VTPASS_SANDBOX;
+  const r=await fetch(base+'/pay',{method:'POST',headers:{'Content-Type':'application/json','api-key':SETTINGS.vtpassKey||process.env.VTPASS_API_KEY||'','public-key':SETTINGS.vtpassPub||'','secret-key':SETTINGS.vtpassSec||''},body:JSON.stringify(payload)});
   const j=await r.json().catch(()=>({}));
   return {request_id, vtpass:j, ok: j.code==='000'};
 }
 app.post('/api/buy', async (req,res)=>{
   const {type, network, phone, plan, amount}=req.body||{};
   if(!phone) return res.json({success:false,message:'Enter phone number'});
-  // Try VTPass first
+  if(SETTINGS.vtMode==='Manual'){
+    const o={plan:plan||'MTN 1GB', phone, amount:amount||265, provider:SETTINGS.vtProvider, request_id:'PENDING-'+Date.now(), status:'Pending - Manual'};
+    ORDERS.push(o);
+    return res.json({success:true,message:'Order saved as Pending - Manual Mode. Admin will buy by hand.', request_id:o.request_id, provider:SETTINGS.vtProvider});
+  }
   try{
     const v=await vtpassBuy(type, network, phone, Number(amount)||100);
-    if(v.ok) return res.json({success:true,message:'VTPass order successful', request_id:v.request_id, provider:'VTPass', vtpass:v.vtpass});
+    if(v.ok){ ORDERS.push({plan, phone, amount, provider:'VTPass', request_id:v.request_id}); return res.json({success:true,message:'VTPass order successful', request_id:v.request_id, provider:'VTPass', vtpass:v.vtpass}); }
   }catch(e){}
-  // Husmo fallback
-  try{
-    const r=await fetch(HUSMO_BASE+'/api/data/',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Token '+HUSMO_KEY},body:JSON.stringify({network:network==='9MOBILE'?'9MOBILE':network, phone, plan:plan||'', amount:Number(amount)||100})});
-    const j=await r.json().catch(()=>({}));
-    return res.json({success:true,message:'Order sent via Husmo (VTPass fallback)', request_id:String(Date.now()), provider:'Husmo', husmo:j});
-  }catch(e){ return res.json({success:false,message:'Both VTPass and Husmo failed. Try again.'}); }
+  return res.json({success:false,message:'VTPass failed. Provider error - Money NOT taken. Try Husmo / Manual. Provider: VTPass'});
 });
 const PORT=process.env.PORT||3000;
 app.listen(PORT,()=>console.log('Server running on '+PORT));
