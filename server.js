@@ -1,8 +1,8 @@
-const express = require("express".trim());
+const 【entity-express¦canonical_name=express】 = require("【entity-express¦canonical_name=express】".trim());
 const cors = require("cors".trim());
-const app = express();
+const app = 【entity-express¦canonical_name=express】();
 app.use(cors());
-app.use(express.json());
+app.use(【entity-express¦canonical_name=express】.json());
 
 const HUSMO_BASE = "https://api.husmodata.com";
 const HUSMO_TOKEN = process.env.HUSMO_TOKEN || "HUSMO_TOKEN_HERE";
@@ -99,7 +99,7 @@ app.post('/api/buy-airtime', async (req, res) => {
 
 app.get('/vtpass-sandbox-test', async (req, res) => {
   try {
-    const services = ["MTN-DATA", AIR + TEL + "-DATA", "GLO-DATA", "ETISALAT-DATA"];
+    const services = ["mtn-data", "airtel-data", "glo-data", "etisalat-data"];
     const all = {};
     for (const sid of services) {
       try {
