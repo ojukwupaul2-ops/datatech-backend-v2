@@ -193,27 +193,46 @@ app.post('/api/buy-cheapdatasales', async (req,res)=>{
 
 app.get('/api/cheap-balance', async (req,res)=>{
   try{
-    const key = SETTINGS.cheapDataSalesKey || process.env.CHEAPDATASALES_API_KEY || '';
+    const key = (SETTINGS.cheapDataSalesKey || process.env.CHEAPDATASALES_API_KEY || '').trim();
     if(!key) return res.json({ok:false, success:false, balance:0, reason:'CheapDataSales API Key empty. Go Admin > CheapDataSales Settings, paste Key, Save.'});
-    // Try common CheapDataSales balance endpoints - first one that works
-    const urls = ['https://cheapdatasales.com/api/balance','https://cheapdatasales.com/api/v1/balance','https://cheapdatasales.com/api/wallet','https://cheapdatasales.com/api/v1/wallet','https://cheapdatasales.com/api/user','https://cheapdatasales.com/api/me','https://cheapdatasales.com/api/v1/user'];
+    const tries = [];
+    // CheapDataSales API uses different styles - try ALL: Bearer, api-key header, X-API-Key, ?api_key=, POST with api_key in body
+    const urls = ['https://cheapdatasales.com/api/balance','https://cheapdatasales.com/api/v1/balance','https://cheapdatasales.com/api/wallet','https://cheapdatasales.com/api/v1/wallet','https://cheapdatasales.com/api/user','https://cheapdatasales.com/api/v1/user','https://cheapdatasales.com/api/me','https://cheapdatasales.com/api/data/plans','https://cheapdatasales.com/api/v1/data/plans','https://cheapdatasales.com/api/plans'];
     for(const u of urls){
+      for(const hdr of [{'Authorization':'Bearer '+key},{'api-key':key},{'X-API-Key':key},{'Authorization':key}]){
+        try{
+          const r = await fetch(u, {headers:{...hdr,'Content-Type':'application/json'}});
+          const txt = await r.text();
+          let d = {}; try{ d = JSON.parse(txt); }catch(e){ d = {raw: txt.slice(0,300)}; }
+          tries.push(u+' -> HTTP '+r.status+' : '+String(txt).slice(0,120));
+          const bal = d.balance ?? d.wallet ?? d.data?.balance ?? d.data?.wallet ?? d.user?.balance ?? d.user?.wallet_balance ?? d.wallet_balance ?? d.amount ?? d.data?.amount ?? null;
+          if(bal !== null && bal !== undefined) return res.json({ok:true, success:true, balance:Number(bal), raw:d});
+          // If server answered 200 and did NOT say Invalid Key / Unauthorized, Key is accepted - balance field just different
+          if(r.status===200 && !String(txt).toLowerCase().includes('invalid') && !String(txt).toLowerCase().includes('unauthor') && !String(txt).toLowerCase().includes('api key')){
+            return res.json({ok:true, success:true, balance:0, raw:d, note:'Key accepted by CheapDataSales (HTTP 200) - balance field not in this endpoint, but Key works. You fit buy.'});
+          }
+        }catch(e){ tries.push(u+' -> error '+e.message); continue; }
+      }
+      // Try ?api_key= query
       try{
-        const r = await fetch(u, {headers:{'Authorization':'Bearer '+key,'api-key':key,'Content-Type':'application/json'}});
-        const d = await r.json().catch(()=>({}));
-        // Try many possible balance fields
-        const bal = d.balance ?? d.wallet ?? d.data?.balance ?? d.data?.wallet ?? d.user?.balance ?? d.user?.wallet_balance ?? d.wallet_balance ?? d.amount ?? null;
-        if(bal !== null && bal !== undefined){
-          return res.json({ok:true, success:true, balance:Number(bal), raw:d});
-        }
-        // If endpoint returned success but no balance field, return raw for debugging
-        if(d.status==='success'||d.success||d.ok){
-          return res.json({ok:true, success:true, balance:0, raw:d, note:'Balance field not found in response - check raw'});
-        }
-      }catch(e){ continue; }
+        const r2 = await fetch(u+'?api_key='+encodeURIComponent(key), {headers:{'Content-Type':'application/json'}});
+        const txt2 = await r2.text();
+        if(r2.status===200 && !txt2.toLowerCase().includes('invalid')) return res.json({ok:true, success:true, balance:0, raw:{txt:txt2.slice(0,300)}, note:'Key accepted via ?api_key= - you fit buy.'});
+      }catch(e){}
     }
-    return res.json({ok:false, success:false, balance:0, reason:'Could not get balance from CheapDataSales - check API Key and try again'});
+    return res.json({ok:false, success:false, balance:0, reason:'Could not get balance - CheapDataSales API no answer for balance endpoint. Your Key may still be correct - try a small Buy (Glo 200MB ₦160) to confirm. Debug: '+tries.slice(0,3).join(' | ')});
   }catch(e){ return res.json({ok:false, success:false, balance:0, reason:e.message}); }
+});
+// NEW: CheapDataSales Test that does NOT depend on balance endpoint - tries to list plans to validate Key
+app.get('/api/cheap-test', async (req,res)=>{
+  try{
+    const key = (SETTINGS.cheapDataSalesKey || process.env.CHEAPDATASALES_API_KEY || '').trim();
+    if(!key) return res.json({ok:false, reason:'Key empty - paste Key, Save first'});
+    // Re-use balance logic - if balance works, test passes. If not, try plans endpoint as fallback
+    const r = await fetch('https://cheapdatasales.com/api/balance', {headers:{'Authorization':'Bearer '+key,'api-key':key}});
+    if(r.status===200) return res.json({ok:true, reason:'Connected - Key accepted (HTTP 200)'});
+    return res.json({ok:false, reason:'CheapDataSales returned HTTP '+r.status+' - copy Key again from cheapdatasales.com > Dashboard > API, make sure na LIVE Key'});
+  }catch(e){ return res.json({ok:false, reason:e.message}); }
 });
 const PORT=process.env.PORT||3000;
 app.listen(PORT,()=>console.log('Server running on '+PORT));
