@@ -205,7 +205,7 @@ app.get('/api/cheap-balance', async (req,res)=>{
           const txt = await r.text();
           let d = {}; try{ d = JSON.parse(txt); }catch(e){ d = {raw: txt.slice(0,300)}; }
           tries.push(u+' -> HTTP '+r.status+' : '+String(txt).slice(0,120));
-          const bal = d.balance ?? d.wallet ?? d.data?.balance ?? d.data?.wallet ?? d.user?.balance ?? d.user?.wallet_balance ?? d.wallet_balance ?? d.amount ?? d.data?.amount ?? null;
+          const bal = d.balance ?? d.wallet ?? d.main_wallet ?? d.mainWallet ?? d.main_wallet_balance ?? d.walletBalance ?? d.wallet_balance ?? d.main_balance ?? d.data?.balance ?? d.data?.wallet ?? d.data?.main_wallet ?? d.data?.mainWallet ?? d.user?.balance ?? d.user?.wallet_balance ?? d.user?.main_wallet ?? d.amount ?? d.data?.amount ?? null;
           if(bal !== null && bal !== undefined) return res.json({ok:true, success:true, balance:Number(bal), raw:d});
           // If server answered 200 and did NOT say Invalid Key / Unauthorized, Key is accepted - balance field just different
           if(r.status===200 && !String(txt).toLowerCase().includes('invalid') && !String(txt).toLowerCase().includes('unauthor') && !String(txt).toLowerCase().includes('api key')){
